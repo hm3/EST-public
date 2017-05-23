@@ -1,0 +1,40 @@
+<html>
+  <title>Dialogue</title>
+  <head>
+    <script src="render.js"></script>
+  </head>
+
+  <body>
+  	<style>
+  	#intro{
+  		text-align: left;
+  	}
+	#rule {
+		display: inline-block;
+		padding-left: 50%;
+		position: absolute;
+		}
+	#rendered{
+		/**top: 35%;**/
+		display: inline-block;
+		position: absolute;
+	}
+	/* hides text box */
+	#input{
+		display: none;
+	}
+    </style>
+    <h2>See a Conversation: <div id="source"></div></h2>
+    <p id = "intro">The goal of casual conversation is to make people more comfortable around each other. <br>
+    	If people are comfortable with each other, they're more open to conversation as the rapport 
+    	between them increases. <br>
+    	Therefore, generally, you want to avoid controversial or highly-specific topics until you have a higher level of rapport. <br>
+		This simulation consists of 2 classmates talking one morning before class, and assumes the conversants only know <br>
+	    each other casually, so for now you are only able to "discuss" benign topics. </p>
+      <p>Press the "Render" button to generate a new conversation.</p>
+      <p>Refresh to clear the conversations from the screen.</p>
+    <textarea id="input" rows=10 cols=80></textarea>
+    <p><input id="renderButton" type="button" value="Render"/></p>
+    <div id="rendered">Conversation: </div><div id = "rule">Guideline:</div>
+  </body>
+</html>

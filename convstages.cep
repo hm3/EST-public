@@ -1,0 +1,218 @@
+character : type.
+alice : character.
+bob : character.
+carol : character.
+
+music : type.
+country_music : music.
+pop_music : music.
+rock_music : music.
+
+smalltalk : type.
+the_weather : smalltalk.
+the_weekend : smalltalk. 
+
+sports : type.
+running : sports.
+playing_baseball : sports.
+playing_soccer : sports.
+
+topic : type.
+person character : topic. 
+genre music : topic. 
+subject smalltalk : topic.
+activity sports : topic. 
+
+sentiment: type.
+positive: sentiment.
+negative: sentiment.
+neutral: sentiment.
+
+statement: type.
+opinion topic sentiment : statement. 
+
+strength : type. %Strength of words used (don't like vs hate etc.)
+typical : strength. %"Cool, I like that."
+strong : strength. %"Awesome, I love that."
+
+feeling : type.
+happy : feeling.
+sad : feeling. 
+annoyed : feeling. 
+content : feeling.
+
+nat : type.
+z : nat.
+s nat : nat.
+
+#builtin NAT nat.
+#builtin NAT_ZERO z.
+#builtin NAT_SUCC s.
+
+greet character character : pred.
+say_goodbye character character : pred.
+has_opinion character topic sentiment : pred.
+says character statement strength : pred.
+question character character statement : pred.
+no_current_topic : pred.
+no_back_and_forth : pred. %so question is only reciprocated once
+not_yet_liked  character character topic : pred. %so C can only like C' for agreeing once. 
+current topic : pred.
+relevant topic topic : pred.
+opposite sentiment sentiment : pred.
+obligation_to_respond character : pred.
+no_obligation_to_respond character : pred.
+interrupts character character : pred.
+is_interrupted character : pred.
+feels character feeling : pred.
+likes character character : pred.
+hasn't_spoken character character : pred.
+different character character : pred.
+turn : pred. %turn for main stage
+superturn nat : pred. %turn for overall
+times_spoken character nat : pred. %times C has spoken; questions and responding to questions don't count.
+
+stage main = {
+	%%%Conversational Rules
+	
+	%"Hello, C."
+	greet : turn * hasn't_spoken C C' -o greet C C'.
+
+	%small talk makes C' more comfortable around C 
+	make_small_talk : no_current_topic * times_spoken C N * turn * $greet C C' * $greet C' C * $has_opinion C (subject S) A * $no_obligation_to_respond C * $no_obligation_to_respond C'  -o says C (opinion (subject S) A) typical  * likes C' C * likes C C' 
+	* current (subject S) * times_spoken C (s N).
+
+	%General discussion with more subjects available than at the beginning of a conversation.
+	%Getting past small talk with C makes C' more comfortable around C
+	make_topic_talk : $current T * times_spoken C N * turn * $has_opinion C T A * $no_obligation_to_respond C * $no_obligation_to_respond C'  -o says C (opinion T A) typical * likes C' C * times_spoken C (s N).
+
+	%Talk leads to C' mentioning something C wants to hear more about
+	%In trace, second person is person to ask question
+	question : $current T * turn * $says C' (opinion T A) typical * $no_obligation_to_respond C * no_obligation_to_respond C' -o question C C' (opinion T A) * obligation_to_respond C'. 
+
+	%"This the_weekend I went to a concert. What about you?" etc.
+	reciprocate_question : no_back_and_forth * $current T * turn * $no_obligation_to_respond C' * no_obligation_to_respond C *  question C C' (opinion T A) -o question C' C (opinion T A) * obligation_to_respond C. 
+
+	%C responds to question by C'
+	%In trace, first person is responder
+	respond : $current T * turn * obligation_to_respond C * $question C' C (opinion T A) * $has_opinion C T B -o says C (opinion T B) typical * no_obligation_to_respond C. 
+
+	%C responds to question by C' in more intense langauge (like vs love etc.)
+	enthusiastic_respond : $current T * turn * obligation_to_respond C * $question C' C (opinion T A) * $has_opinion C T B -o says C (opinion T B) strong * no_obligation_to_respond C. 
+
+	%C continues talking about the topic they were asked about; more detailed
+	continue_talking : $current T * times_spoken C N * turn * $says C (opinion T A) Q * $has_opinion C T B * $no_obligation_to_respond C * $no_obligation_to_respond C' -o says C (opinion T B) typical * times_spoken C (s N).
+
+	%C changes the topic; can change topic once has spoken
+	change_topic : $no_obligation_to_respond C * $no_obligation_to_respond C' * times_spoken C N * turn  * $says C (opinion T A) Q * $has_opinion C T A * current T * $relevant T T' -o current T' * times_spoken C (s N). 
+
+}
+#interactive main.
+stage goodbye = {
+
+	%"I have to go now, but it was nice talking with you, C."
+	say_goodbye : turn * $greet C C' * $greet C' C -o say_goodbye C C'. 
+	}
+
+stage processing = {
+	%%%Affinity Rules
+
+	%If C' says something C agrees with, C will like C' more.
+	%Liking C' means C is open to more conversation with C'. 
+	like_from_agreement : $current T * not_yet_liked C C' T * $different C C' * $has_opinion C T A * $says C' (opinion T A) Q -o likes C C'. 
+
+	%If C' expresses great dislike for something C likes, C will like C' less.
+	dislike_from_strong_disagreement : $current T * likes C C' * $different C C' * $has_opinion C T A * $says C' (opinion T B) strong * $opposite A B -o ().
+
+	%%%Feeling Rules 
+
+	%10 turns, so if one participant talks 60% of the time, participation is too one-sided and C becomes annoyed.
+	annoyed_from_unfair_participation : feels C content * $different C C' * $times_spoken C' 6 -o feels C annoyed. 
+
+	%If C is annoyed, they will end the conversation. 
+	%"I have to go now."
+	terminate_conversation : feels C annoyed * superturn N -o superturn 0.
+
+}
+
+main_to_processing : qui * stage main -o stage processing.
+processing_to_main : qui * superturn (s N) * stage processing -o stage main * superturn N * turn.
+processing_to_goodbye : qui * superturn 0 * stage processing -o stage goodbye * turn. 
+
+context init = {
+	different alice bob,
+	different bob alice,
+	hasn't_spoken alice bob,
+	feels alice content,
+	feels bob content,
+	hasn't_spoken bob alice,
+	no_current_topic,
+	no_back_and_forth,
+	no_obligation_to_respond alice,
+	no_obligation_to_respond bob,
+	not_yet_liked alice bob (subject the_weekend),
+	not_yet_liked bob alice (subject the_weekend), 
+	not_yet_liked alice bob (subject the_weather),
+	not_yet_liked bob alice (subject the_weather),
+	not_yet_liked alice bob (genre country_music),
+	not_yet_liked bob alice (genre country_music),
+	not_yet_liked alice bob (genre pop_music),
+	not_yet_liked bob alice (genre pop_music),
+	not_yet_liked alice bob (genre rock_music),
+	not_yet_liked bob alice (genre rock_music),
+	not_yet_liked alice bob (activity running),
+	not_yet_liked bob alice (activity running),
+	not_yet_liked alice bob (activity playing_baseball),
+	not_yet_liked bob alice (activity playing_baseball),
+	not_yet_liked alice bob (activity playing_soccer),
+	not_yet_liked bob alice (activity playing_soccer),
+	has_opinion alice (subject the_weekend) positive,
+	has_opinion bob (subject the_weekend) positive,
+	has_opinion alice (subject the_weather) positive,
+	has_opinion bob (subject the_weather) negative,
+	has_opinion alice (genre country_music) negative,
+	has_opinion bob (genre country_music) positive,
+	has_opinion alice (genre pop_music) neutral,
+	has_opinion bob (genre pop_music) neutral,
+	has_opinion alice (genre rock_music) positive,
+	has_opinion bob (genre rock_music) negative,
+	has_opinion alice (activity running) positive,
+	has_opinion bob (activity running) neutral,
+	has_opinion alice (activity playing_baseball) neutral,
+	has_opinion bob (activity playing_baseball) positive,
+	has_opinion alice (activity playing_soccer) neutral,
+	has_opinion bob (activity playing_soccer) neutral, 
+	relevant (subject the_weather) (subject the_weekend),
+	relevant (subject the_weekend) (subject the_weather),
+	relevant (subject the_weekend) (genre country_music), %C mentions something about listening to music over the the_weekend
+	relevant (subject the_weekend) (genre pop_music),
+	relevant (subject the_weekend) (genre rock_music),
+	relevant (genre country_music) (subject the_weekend),
+	relevant (genre pop_music) (subject the_weekend),
+	relevant (genre rock_music) (subject the_weekend),
+	relevant (genre country_music) (genre rock_music),
+	relevant (genre country_music) (genre pop_music),
+	relevant (genre rock_music) (genre country_music),
+	relevant (genre rock_music) (genre pop_music),
+	relevant (genre pop_music) (genre rock_music),
+	relevant (genre pop_music) (genre country_music),
+	relevant (subject the_weather) (activity running), %C mentions how the the_weather is perfect for playing (sport)
+	relevant (subject the_weather) (activity playing_baseball),
+	relevant (subject the_weather) (activity playing_soccer),
+	relevant (activity running) (subject the_weather),
+	relevant (activity playing_baseball) (subject the_weather),
+	relevant (activity playing_soccer) (subject the_weather),
+	relevant (activity running) (activity playing_baseball),
+	relevant (activity running) (activity playing_soccer),
+	relevant (activity playing_baseball) (activity running),
+	relevant (activity playing_baseball) (activity playing_soccer),
+	relevant (activity playing_soccer) (activity running),
+	relevant (activity playing_soccer) (activity playing_baseball),
+	opposite positive negative,
+	opposite negative positive,
+	times_spoken alice 0,
+	times_spoken bob 0,
+	turn,
+	superturn 10
+}.
+#trace _ main init.
